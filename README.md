@@ -215,7 +215,7 @@ We prioritize:
 
 ## License
 
-MIT © [Your Name]
+MIT © E.P.
 
 ## Resources
 
@@ -232,7 +232,3 @@ Built with:
 - [fs-extra](https://github.com/jprichardson/node-fs-extra) - File operations
 - [chalk](https://github.com/chalk/chalk) - Terminal styling
 - [ora](https://github.com/sindresorhus/ora) - Elegant spinners
-
----
-
-**Happy coding!** 🚀

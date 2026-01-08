@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import fse from 'fs-extra';
 import { join } from 'path';
 import type { GeneratorConfig } from './types.js';
-import { FeaturePatcher } from './feature-patcher';
+import { FeaturePatcher } from './feature-patcher.js';
 import ora from 'ora';
 
 export class GeneratorEngine {

@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { which } from './utils';
+import { which } from './utils.js';
 
 export class WailsCLIManager {
   async detect(version: 2 | 3): Promise<{ installed: boolean; version?: string; path?: string }> {

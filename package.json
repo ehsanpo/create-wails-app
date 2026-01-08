@@ -31,16 +31,16 @@
     "typescript",
     "create-app"
   ],
-  "author": "create-wails-app contributors",
+  "author": "E.P. <ehsanpo@users.noreply.github.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/create-wails-app.git"
+    "url": "https://github.com/ehsanpo/create-wails-app.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/create-wails-app/issues"
+    "url": "https://github.com/ehsanpo/create-wails-app/issues"
   },
-  "homepage": "https://github.com/yourusername/create-wails-app#readme",
+  "homepage": "https://github.com/ehsanpo/create-wails-app#readme",
   "dependencies": {
     "@oclif/core": "^3.15.1",
     "chalk": "^5.3.0",
