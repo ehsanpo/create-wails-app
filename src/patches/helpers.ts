@@ -6,7 +6,14 @@ export async function addNpmDependencies(
   dependencies: Record<string, string>,
   isDev: boolean
 ): Promise<void> {
-  const packageJsonPath = join(projectPath, 'package.json');
+  // In Wails v3, package.json is in frontend/ directory
+  // In Wails v2, package.json is in the root
+  // Try frontend/ first, then fall back to root
+  let packageJsonPath = join(projectPath, 'frontend', 'package.json');
+  
+  if (!(await fse.pathExists(packageJsonPath))) {
+    packageJsonPath = join(projectPath, 'package.json');
+  }
   
   if (!(await fse.pathExists(packageJsonPath))) {
     return;
