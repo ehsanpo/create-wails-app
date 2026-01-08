@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
 import { readTemplate } from './template-reader.js';
+import { patchMainGo, mainGoContains } from './helpers.js';
 
 export async function applySingleInstance(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding single instance lock...').start();
@@ -14,7 +15,34 @@ export async function applySingleInstance(config: GeneratorConfig): Promise<void
     
     await fse.writeFile(singleInstancePath, singleInstanceCode);
 
-    spinner.succeed('Single instance lock added ');
+    // Patch main.go to initialize single instance lock
+    const alreadyPatched = await mainGoContains(config.projectPath, 'initSingleInstance');
+    
+    if (!alreadyPatched) {
+      if (config.wailsVersion === 3) {
+        // For v3, add before app.Run()
+        await patchMainGo(config.projectPath, 3, {
+          beforeRun: `\t// Initialize single instance lock
+\tif err := appInstance.initSingleInstance(); err != nil {
+\t\tfmt.Println(err)
+\t\tos.Exit(1)
+\t}
+\tdefer appInstance.releaseSingleInstance()`,
+        });
+      } else {
+        // For v2, add in main() before wails.Run
+        await patchMainGo(config.projectPath, 2, {
+          beforeRun: `\t// Initialize single instance lock
+\tif err := app.initSingleInstance(); err != nil {
+\t\tfmt.Println(err)
+\t\tos.Exit(1)
+\t}
+\tdefer app.releaseSingleInstance()`,
+        });
+      }
+    }
+
+    spinner.succeed('Single instance lock added');
   } catch (error) {
     spinner.fail('Failed to add single instance lock');
     throw error;

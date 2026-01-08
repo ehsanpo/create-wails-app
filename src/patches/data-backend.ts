@@ -2,7 +2,7 @@ import fse from 'fs-extra';
 import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
-import { addGoComment, addNpmDependencies } from './helpers.js';
+import { addGoComment, addNpmDependencies, patchMainGo, mainGoContains } from './helpers.js';
 import { readTemplate } from './template-reader.js';
 
 export async function applySQLite(config: GeneratorConfig): Promise<void> {
@@ -34,7 +34,37 @@ export async function applySQLite(config: GeneratorConfig): Promise<void> {
       }
     }
 
-    spinner.succeed('SQLite support added ');
+    // Patch main.go to initialize database
+    const alreadyPatched = await mainGoContains(config.projectPath, 'InitDatabase');
+    
+    if (!alreadyPatched) {
+      if (config.wailsVersion === 3) {
+        // For v3, add after app creation
+        await patchMainGo(config.projectPath, 3, {
+          afterAppCreation: `\t// Initialize database
+\tif err := appInstance.InitDatabase(); err != nil {
+\t\tfmt.Println("Failed to initialize database:", err)
+\t}`,
+        });
+      } else {
+        // For v2, we need to add it in the startup method of app.go
+        const appGoPath = join(config.projectPath, 'app.go');
+        if (await fse.pathExists(appGoPath)) {
+          let appContent = await fse.readFile(appGoPath, 'utf-8');
+          
+          // Check if startup method exists and add InitDatabase call
+          if (appContent.includes('func (a *App) startup(ctx context.Context)') && !appContent.includes('InitDatabase')) {
+            appContent = appContent.replace(
+              /(func \(a \*App\) startup\(ctx context\.Context\) \{\s*a\.ctx = ctx)/,
+              '$1\n\ta.InitDatabase()'
+            );
+            await fse.writeFile(appGoPath, appContent);
+          }
+        }
+      }
+    }
+
+    spinner.succeed('SQLite support added');
   } catch (error) {
     spinner.fail('Failed to add SQLite support');
     throw error;

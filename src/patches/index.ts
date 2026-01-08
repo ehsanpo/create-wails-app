@@ -25,4 +25,4 @@ export {
   applyFrontendE2ETesting,
   applyBackendTesting,
 } from './testing.js';
-export { addNpmDependencies, addGoComment } from './helpers.js';
+export { addNpmDependencies, addGoComment, patchMainGo, mainGoContains } from './helpers.js';

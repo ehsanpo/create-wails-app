@@ -15,7 +15,7 @@ export async function applyTailwind(config: GeneratorConfig): Promise<void> {
     await fse.writeFile(tailwindConfigPath, tailwindConfig);
 
     // Add PostCSS config
-    const postcssConfigPath = join(config.projectPath, 'postcss.config.js');
+    const postcssConfigPath = join(config.projectPath, 'frontend', 'postcss.config.js');
     const postcssConfig = await readTemplate('tailwind/postcss.config.js', config.wailsVersion);
     await fse.writeFile(postcssConfigPath, postcssConfig);
 
