@@ -1,0 +1,37 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+.vscode/
+.idea/
+*.log
+.DS_Store
+
+# Test files
+test/
+tests/
+*.test.ts
+*.spec.ts
+
+# Documentation (keep in npm package)
+# README.md
+# LICENSE
+# CHANGELOG.md
+
+# Build artifacts
+*.tsbuildinfo
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Misc
+Plan.md
+templates.md
+CONTRIBUTING.md
+EXAMPLES.md
