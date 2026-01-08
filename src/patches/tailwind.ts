@@ -6,35 +6,26 @@ import { addNpmDependencies } from './helpers.js';
 import { readTemplate } from './template-reader.js';
 
 export async function applyTailwind(config: GeneratorConfig): Promise<void> {
-  const spinner = ora('Adding Tailwind CSS...').start();
+  const spinner = ora('Adding Tailwind CSS v4...').start();
   
   try {
-    // Add Tailwind config
-    const tailwindConfigPath = join(config.projectPath, 'tailwind.config.js');
-    const tailwindConfig = await readTemplate('tailwind/tailwind.config.js', config.wailsVersion);
-    await fse.writeFile(tailwindConfigPath, tailwindConfig);
+    // Tailwind v4 no longer needs tailwind.config.js or postcss.config.js
+    // Configuration is done via CSS or via @config directive
 
-    // Add PostCSS config
-    const postcssConfigPath = join(config.projectPath, 'frontend', 'postcss.config.js');
-    const postcssConfig = await readTemplate('tailwind/postcss.config.js', config.wailsVersion);
-    await fse.writeFile(postcssConfigPath, postcssConfig);
-
-    // Add CSS file
+    // Add CSS file with v4 import syntax
     const cssPath = join(config.projectPath, 'src', 'index.css');
     const cssContent = await readTemplate('tailwind/index.css', config.wailsVersion);
     await fse.ensureDir(join(config.projectPath, 'src'));
     await fse.writeFile(cssPath, cssContent);
 
-    // Add npm dependencies
+    // Add npm dependencies (v4 has PostCSS and Autoprefixer built-in)
     await addNpmDependencies(config.projectPath, {
-      tailwindcss: '^3.4.0',
-      autoprefixer: '^10.4.16',
-      postcss: '^8.4.32',
+      tailwindcss: '^4.1.18',
     }, true);
 
-    spinner.succeed('Tailwind CSS added');
+    spinner.succeed('Tailwind CSS v4 added');
   } catch (error) {
-    spinner.fail('Failed to add Tailwind CSS');
+    spinner.fail('Failed to add Tailwind CSS v4');
     throw error;
   }
 }

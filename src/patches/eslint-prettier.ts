@@ -39,8 +39,8 @@ export async function applyESLintPrettier(config: GeneratorConfig): Promise<void
 
     // Add dependencies
     await addNpmDependencies(config.projectPath, {
-      eslint: '^8.56.0',
-      prettier: '^3.1.1',
+      eslint: '^9.39.2',
+      prettier: '^3.7.4',
     }, true);
 
     spinner.succeed('ESLint & Prettier added');
