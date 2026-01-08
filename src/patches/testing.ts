@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
 import { addGoComment, addNpmDependencies } from './helpers.js';
+import { readTemplate } from './template-reader.js';
 
 export async function applyFrontendUnitTesting(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding frontend unit testing (Vitest)...').start();
@@ -10,16 +11,7 @@ export async function applyFrontendUnitTesting(config: GeneratorConfig): Promise
   try {
     // Vitest config
     const vitestConfigPath = join(config.projectPath, 'vitest.config.ts');
-    const vitestConfig = `import { defineConfig } from 'vitest/config'
-
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'jsdom',
-  },
-})
-`;
-    
+    const vitestConfig = await readTemplate('testing/vitest.config.ts', config.wailsVersion);
     await fse.writeFile(vitestConfigPath, vitestConfig);
 
     // Add dependencies
@@ -42,27 +34,7 @@ export async function applyFrontendE2ETesting(config: GeneratorConfig): Promise<
   try {
     // Playwright config
     const playwrightConfigPath = join(config.projectPath, 'playwright.config.ts');
-    const playwrightConfig = `import { defineConfig, devices } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
-  use: {
-    trace: 'on-first-retry',
-  },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-});
-`;
-    
+    const playwrightConfig = await readTemplate('testing/playwright.config.ts', config.wailsVersion);
     await fse.writeFile(playwrightConfigPath, playwrightConfig);
 
     // Create e2e directory
@@ -85,13 +57,7 @@ export async function applyBackendTesting(config: GeneratorConfig): Promise<void
   const spinner = ora('Adding Go backend tests...').start();
   
   try {
-    const comment = `
-// Go Backend Testing
-// Create test files with _test.go suffix
-// Use testing package: import "testing"
-// Run tests with: go test ./...
-`;
-    
+    const comment = await readTemplate('testing/backend-test-comment.txt', config.wailsVersion);
     await addGoComment(config.projectPath, comment);
     
     spinner.succeed('Go backend testing support added');

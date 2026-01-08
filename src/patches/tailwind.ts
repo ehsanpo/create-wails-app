@@ -3,6 +3,7 @@ import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
 import { addNpmDependencies } from './helpers.js';
+import { readTemplate } from './template-reader.js';
 
 export async function applyTailwind(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding Tailwind CSS...').start();
@@ -10,37 +11,17 @@ export async function applyTailwind(config: GeneratorConfig): Promise<void> {
   try {
     // Add Tailwind config
     const tailwindConfigPath = join(config.projectPath, 'tailwind.config.js');
-    const tailwindConfig = `/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx,vue,svelte}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}`;
-
+    const tailwindConfig = await readTemplate('tailwind/tailwind.config.js', config.wailsVersion);
     await fse.writeFile(tailwindConfigPath, tailwindConfig);
 
     // Add PostCSS config
     const postcssConfigPath = join(config.projectPath, 'postcss.config.js');
-    const postcssConfig = `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}`;
-
+    const postcssConfig = await readTemplate('tailwind/postcss.config.js', config.wailsVersion);
     await fse.writeFile(postcssConfigPath, postcssConfig);
 
     // Add CSS file
     const cssPath = join(config.projectPath, 'src', 'index.css');
-    const cssContent = `@tailwind base;
-@tailwind components;
-@tailwind utilities;`;
-
+    const cssContent = await readTemplate('tailwind/index.css', config.wailsVersion);
     await fse.ensureDir(join(config.projectPath, 'src'));
     await fse.writeFile(cssPath, cssContent);
 

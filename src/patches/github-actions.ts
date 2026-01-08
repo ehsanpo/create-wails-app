@@ -2,6 +2,7 @@ import fse from 'fs-extra';
 import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
+import { readTemplate } from './template-reader.js';
 
 export async function applyGitHubActions(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding GitHub Actions...').start();
@@ -11,11 +12,11 @@ export async function applyGitHubActions(config: GeneratorConfig): Promise<void>
     await fse.ensureDir(workflowsDir);
 
     // CI Workflow
-    const ciWorkflow = generateCIWorkflow(config);
+    const ciWorkflow = await generateCIWorkflow(config);
     await fse.writeFile(join(workflowsDir, 'ci.yml'), ciWorkflow);
 
     // Build & Release Workflow
-    const releaseWorkflow = generateReleaseWorkflow(config);
+    const releaseWorkflow = await generateReleaseWorkflow(config);
     await fse.writeFile(join(workflowsDir, 'release.yml'), releaseWorkflow);
 
     spinner.succeed('GitHub Actions workflows added');
@@ -25,55 +26,15 @@ export async function applyGitHubActions(config: GeneratorConfig): Promise<void>
   }
 }
 
-function generateCIWorkflow(config: GeneratorConfig): string {
-  return `name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-22.04
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Install Linux dependencies
-          if: runner.os == 'Linux'
-          run: |
-          sudo apt update
-          sudo apt install -y \
-              libgtk-3-dev \
-              libwebkit2gtk-4.0-dev \
-              pkg-config \
-              gcc
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      
-      - name: Install dependencies
-        run: npm install
-      
-      ${config.features.eslintPrettier ? `- name: Run ESLint
-        run: npm run lint
-      ` : ''}
-      ${config.features.testingFrontendUnit ? `- name: Run unit tests
-        run: npm run test
-      ` : ''}
-      ${config.features.testingBackend ? `- name: Run Go tests
-        run: go test ./...
-      ` : ''}
-`;
+async function generateCIWorkflow(config: GeneratorConfig): Promise<string> {
+  const eslintStep = config.features.eslintPrettier ? '- name: Run ESLint\n        run: npm run lint\n      ' : '';
+  const unitTestStep = config.features.testingFrontendUnit ? '- name: Run unit tests\n        run: npm run test\n      ' : '';
+  const backendTestStep = config.features.testingBackend ? '- name: Run Go tests\n        run: go test ./...\n      ' : '';
+  
+  return (await readTemplate('github-actions/ci.yml', config.wailsVersion))
+    .replace(/{{ESLINT_STEP}}/g, eslintStep)
+    .replace(/{{UNIT_TEST_STEP}}/g, unitTestStep)
+    .replace(/{{BACKEND_TEST_STEP}}/g, backendTestStep);
 }
 
 function generateReleaseWorkflow(config: GeneratorConfig): string {
@@ -155,3 +116,4 @@ jobs:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 `;
 }
+

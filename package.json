@@ -7,6 +7,13 @@
     "create-wails-app": "./bin/run.js"
   },
   "type": "module",
+  "files": [
+    "dist",
+    "bin",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

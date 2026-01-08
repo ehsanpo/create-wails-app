@@ -7,7 +7,7 @@ export class PromptEngine {
     const wailsVersion = await this.promptWailsVersion();
     const frontend = await this.promptFrontend(wailsVersion.wailsVersion);
     const frontendExtras = await this.promptFrontendExtras();
-    const appFeatures = await this.promptAppFeatures();
+    const appFeatures = await this.promptAppFeatures(wailsVersion.wailsVersion);
     const dataBackend = await this.promptDataBackend();
     const testing = await this.promptTesting();
 
@@ -112,23 +112,29 @@ export class PromptEngine {
     ]);
   }
 
-  private async promptAppFeatures() {
+  private async promptAppFeatures(wailsVersion: 2 | 3) {
+    const choices = [
+      { name: 'Single instance lock', value: 'single-instance' },
+      { name: 'Auto update (GitHub Releases)', value: 'auto-update' },
+      { name: 'Native dialogs', value: 'native-dialogs' },
+      { name: 'App config / settings store', value: 'app-config' },
+      { name: 'Deep linking (custom protocol)', value: 'deep-linking' },
+      { name: 'Startup / auto-launch', value: 'startup' },
+      { name: 'Clipboard utilities', value: 'clipboard' },
+      { name: 'File system watcher', value: 'file-watcher' },
+    ];
+
+    // System tray is only available in Wails v3
+    if (wailsVersion === 3) {
+      choices.splice(1, 0, { name: 'System tray', value: 'system-tray' });
+    }
+
     return inquirer.prompt([
       {
         type: 'checkbox',
         name: 'appFeatures',
         message: 'Select app features:',
-        choices: [
-          { name: 'Single instance lock', value: 'single-instance' },
-          { name: 'System tray', value: 'system-tray' },
-          { name: 'Auto update (GitHub Releases)', value: 'auto-update' },
-          { name: 'Native dialogs', value: 'native-dialogs' },
-          { name: 'App config / settings store', value: 'app-config' },
-          { name: 'Deep linking (custom protocol)', value: 'deep-linking' },
-          { name: 'Startup / auto-launch', value: 'startup' },
-          { name: 'Clipboard utilities', value: 'clipboard' },
-          { name: 'File system watcher', value: 'file-watcher' },
-        ],
+        choices,
       },
     ]);
   }
