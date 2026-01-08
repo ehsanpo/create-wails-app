@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import fse from 'fs-extra';
 import { join } from 'path';
 import type { GeneratorConfig } from './types.js';
-import { FeaturePatcher } from './feature-patcher.js';
+import { FeaturePatcher } from './feature-patcher';
 import ora from 'ora';
 
 export class GeneratorEngine {
@@ -65,6 +65,11 @@ export class GeneratorEngine {
     // For Wails v2, use template URL if available
     // For Wails v3, use built-in templates
     if (config.wailsVersion === 3) {
+      return config.frontend;
+    }
+
+    // For Wails v2, if template is "default", don't specify template (use built-in)
+    if (config.template.url === 'default') {
       return config.frontend;
     }
 

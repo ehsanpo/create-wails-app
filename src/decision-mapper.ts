@@ -75,7 +75,7 @@ export class DecisionMapper {
 
     // React templates (Wails v2)
     templates.set('react-2', {
-      url: 'https://github.com/wailsapp/wails-vite-react-ts-tailwind-template',
+      url: 'https://github.com/hotafrika/wails-vite-react-ts-tailwind-template',
       name: 'react-vite-ts-tailwind',
       wailsVersion: 2,
       frontend: 'react',
@@ -108,45 +108,45 @@ export class DecisionMapper {
       hasTypeScript: true,
     });
 
-    // Vanilla templates
+    // Vanilla templates - use default Wails templates
     templates.set('vanilla-2', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'vanilla',
       wailsVersion: 2,
       frontend: 'vanilla',
     });
 
-    // Wails v3 templates (use default for now as v3 is experimental)
+    // Wails v3 templates - use default (built-in templates)
     templates.set('react-3', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'react',
       wailsVersion: 3,
       frontend: 'react',
     });
 
     templates.set('vue-3', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'vue',
       wailsVersion: 3,
       frontend: 'vue',
     });
 
     templates.set('svelte-3', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'svelte',
       wailsVersion: 3,
       frontend: 'svelte',
     });
 
     templates.set('solid-3', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'solid',
       wailsVersion: 3,
       frontend: 'solid',
     });
 
     templates.set('vanilla-3', {
-      url: 'https://github.com/wailsapp/wails',
+      url: 'default',
       name: 'vanilla',
       wailsVersion: 3,
       frontend: 'vanilla',

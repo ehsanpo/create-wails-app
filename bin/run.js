@@ -2,16 +2,16 @@
 
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const require = createRequire(import.meta.url);
 
 // Import and run the CLI
 const cliPath = join(__dirname, '..', 'dist', 'index.js');
+const cliURL = pathToFileURL(cliPath).href;
 
-import(cliPath).catch((error) => {
+import(cliURL).catch((error) => {
   console.error('Failed to load CLI:', error);
   process.exit(1);
 });
