@@ -10,7 +10,7 @@ import (
 var lockFile string
 
 // initSingleInstance initializes the single instance lock
-func (a *App) initSingleInstance() error {
+func initSingleInstance() error {
 	// Get user's temp directory
 	tmpDir := os.TempDir()
 	lockFile = filepath.Join(tmpDir, "{{PROJECT_NAME}}.lock")
@@ -36,7 +36,7 @@ func (a *App) initSingleInstance() error {
 }
 
 // releaseSingleInstance removes the lock file
-func (a *App) releaseSingleInstance() {
+func releaseSingleInstance() {
 	if lockFile != "" {
 		os.Remove(lockFile)
 	}

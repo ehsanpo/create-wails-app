@@ -82,12 +82,25 @@ export async function patchMainGo(
     // Wails v3 uses application.New()
     // Add code after app := application.New(...)
     if (options.afterAppCreation) {
-      const appCreationPattern = /app\s*:=\s*application\.New\([^)]*\{[^}]*\}\s*\)/s;
-      const match = content.match(appCreationPattern);
+      // Find the application.New() call and properly match nested braces
+      const appCreationStart = content.indexOf('app := application.New(');
       
-      if (match) {
-        const insertPos = match.index! + match[0].length;
-        content = content.slice(0, insertPos) + '\n\n' + options.afterAppCreation + content.slice(insertPos);
+      if (appCreationStart !== -1) {
+        // Start from the opening parenthesis
+        let pos = appCreationStart + 'app := application.New('.length;
+        let depth = 1;
+        
+        // Find the matching closing parenthesis
+        while (pos < content.length && depth > 0) {
+          if (content[pos] === '(') depth++;
+          else if (content[pos] === ')') depth--;
+          pos++;
+        }
+        
+        // Insert after the closing parenthesis
+        if (depth === 0) {
+          content = content.slice(0, pos) + '\n\n' + options.afterAppCreation + content.slice(pos);
+        }
       }
     }
 

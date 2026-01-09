@@ -1,40 +1,38 @@
 package main
 
 import (
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// setupSystemTray creates and configures the system tray
-func (a *App) setupSystemTray() *menu.Menu {
-	// Create system tray menu
-	trayMenu := menu.NewMenu()
+// setupSystemTray creates and configures the system tray with menu items
+func (a *App) setupSystemTray(app *application.App, systray *application.SystemTray, window *application.WebviewWindow) {
+	// Create the tray menu
+	menu := app.NewMenu()
 
 	// Show/Hide window item
-	trayMenu.Append(menu.Text("Show Window", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
-		runtime.WindowShow(a.ctx)
-		runtime.WindowUnminimise(a.ctx)
-	}))
+	menu.Add("Show Window").OnClick(func(ctx *application.Context) {
+		window.Show()
+		window.SetAlwaysOnTop(false)
+	})
 
-	trayMenu.Append(menu.Separator())
+	menu.AddSeparator()
 
 	// Quit item
-	trayMenu.Append(menu.Text("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
-		runtime.Quit(a.ctx)
-	}))
+	menu.Add("Quit").OnClick(func(ctx *application.Context) {
+		app.Quit()
+	})
 
-	return trayMenu
+	// Set the menu on the system tray
+	systray.SetMenu(menu)
 }
 
 // OnTrayIconLeftClick handles left click on system tray icon
 func (a *App) OnTrayIconLeftClick() {
-	runtime.WindowShow(a.ctx)
-	runtime.WindowUnminimise(a.ctx)
+	// This will be handled by Wails automatically
 }
 
 // OnTrayIconRightClick handles right click on system tray icon
-// This will show the tray menu automatically
 func (a *App) OnTrayIconRightClick() {
-	// Menu is shown automatically by Wails
+	// This will show the menu automatically
 }
+

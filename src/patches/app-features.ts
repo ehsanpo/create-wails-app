@@ -20,14 +20,36 @@ export async function applySingleInstance(config: GeneratorConfig): Promise<void
     
     if (!alreadyPatched) {
       if (config.wailsVersion === 3) {
+        // First, add necessary imports to main.go
+        const mainGoPath = join(config.projectPath, 'main.go');
+        let content = await fse.readFile(mainGoPath, 'utf-8');
+        
+        // Add fmt import if not present
+        if (!content.includes('"fmt"')) {
+          content = content.replace(
+            /import \(\s*\n/,
+            'import (\n\t"fmt"\n'
+          );
+        }
+        
+        // Add os import if not present
+        if (!content.includes('"os"')) {
+          content = content.replace(
+            /import \(\s*\n/,
+            'import (\n\t"os"\n'
+          );
+        }
+        
+        await fse.writeFile(mainGoPath, content);
+        
         // For v3, add before app.Run()
         await patchMainGo(config.projectPath, 3, {
           beforeRun: `\t// Initialize single instance lock
-\tif err := appInstance.initSingleInstance(); err != nil {
+\tif err := initSingleInstance(); err != nil {
 \t\tfmt.Println(err)
 \t\tos.Exit(1)
 \t}
-\tdefer appInstance.releaseSingleInstance()`,
+\tdefer releaseSingleInstance()`,
         });
       } else {
         // For v2, add in main() before wails.Run

@@ -22,9 +22,14 @@ export async function applyTailwind(config: GeneratorConfig): Promise<void> {
     await importCSSInEntryPoint(config);
 
     // Add npm dependencies (v4 has PostCSS and Autoprefixer built-in)
+    // Vite-based projects need @tailwindcss/vite plugin
     await addNpmDependencies(config.projectPath, {
       tailwindcss: '^4.1.18',
+      '@tailwindcss/vite': '^4.1.18',
     }, true);
+
+    // Update vite.config to add Tailwind plugin
+    await updateViteConfig(config);
 
     spinner.succeed('Tailwind CSS v4 added');
   } catch (error) {
@@ -94,4 +99,64 @@ async function importCSSInEntryPoint(config: GeneratorConfig): Promise<void> {
   
   // Write back to file
   await fse.writeFile(entryFile, content);
+}
+
+/**
+ * Update vite.config to add Tailwind CSS plugin
+ */
+async function updateViteConfig(config: GeneratorConfig): Promise<void> {
+  const viteConfigPath = join(config.projectPath, 'frontend', 'vite.config.js');
+  
+  if (!await fse.pathExists(viteConfigPath)) {
+    return; // No vite.config.js found
+  }
+
+  let content = await fse.readFile(viteConfigPath, 'utf-8');
+  
+  // Check if tailwindcss is already imported
+  if (content.includes('@tailwindcss/vite')) {
+    return; // Already configured
+  }
+
+  // Add import statement
+  const lines = content.split('\n');
+  let lastImportIndex = 0;
+  
+  // Find the last import statement
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().startsWith('import ')) {
+      lastImportIndex = i;
+    }
+  }
+  
+  // Insert tailwindcss import after the last import
+  lines.splice(lastImportIndex + 1, 0, 'import tailwindcss from \'@tailwindcss/vite\'');
+  
+  // Update plugins array to include tailwindcss()
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('plugins:') && lines[i].includes('[')) {
+      // Find the framework plugin (vue(), react(), svelte(), etc.)
+      const pluginsLine = lines[i];
+      
+      // Check if it's a single-line plugins array
+      if (pluginsLine.includes(']')) {
+        // Single line format: plugins: [vue(), wails("./bindings")]
+        lines[i] = pluginsLine.replace(/\[(.*?)\]/, (match, plugins) => {
+          // Split plugins and insert tailwindcss() after the first plugin
+          const pluginsList = plugins.split(',').map((p: string) => p.trim());
+          
+          // Insert tailwindcss() after the framework plugin (first one)
+          if (pluginsList.length > 0) {
+            pluginsList.splice(1, 0, 'tailwindcss()');
+          }
+          
+          return `[${pluginsList.join(', ')}]`;
+        });
+        break;
+      }
+    }
+  }
+  
+  content = lines.join('\n');
+  await fse.writeFile(viteConfigPath, content);
 }

@@ -9,25 +9,60 @@ export async function applySystemTray(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding system tray support...').start();
   
   try {
-    // Create system tray Go file
-    const trayGoPath = join(config.projectPath, 'systray.go');
-    const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
-    await fse.writeFile(trayGoPath, trayGoContent);
-
     // Patch main.go to initialize system tray
     if (config.wailsVersion === 3) {
-      // Wails v3 approach
+      // Wails v3 approach - add full implementation directly to main.go
       const alreadyPatched = await mainGoContains(config.projectPath, 'SystemTray.New()');
       
       if (!alreadyPatched) {
+        // First, add the icon embed directive at the top of the file
+        const mainGoPath = join(config.projectPath, 'main.go');
+        let content = await fse.readFile(mainGoPath, 'utf-8');
+        
+        // Add icon embed after the assets embed
+        if (!content.includes('//go:embed build/appicon.png')) {
+          const assetsEmbedPattern = /(\/\/go:embed all:frontend\/dist\s*\n\s*var assets embed\.FS)/;
+          const match = content.match(assetsEmbedPattern);
+          
+          if (match) {
+            const insertPos = match.index! + match[0].length;
+            content = content.slice(0, insertPos) + 
+              '\n\n//go:embed build/appicon.png\nvar trayIcon []byte' + 
+              content.slice(insertPos);
+            await fse.writeFile(mainGoPath, content);
+          }
+        }
+        
+        // Now add the system tray initialization code after app creation
         await patchMainGo(config.projectPath, 3, {
           afterAppCreation: `\t// Create system tray
 \tsystray := app.SystemTray.New()
+\tsystray.SetIcon(trayIcon)
 \tsystray.SetLabel("${config.projectName}")
-\t// systray.SetIcon(trayIcon) // Uncomment and add icon data`,
+
+\t// Add system tray menu
+\tmenu := app.NewMenu()
+\tmenu.Add("Show Window").OnClick(func(ctx *application.Context) {
+\t\t// Show and unminimize the window
+\t\twindows := app.Window.GetAll()
+\t\tif len(windows) > 0 {
+\t\t\twindows[0].Show()
+\t\t\twindows[0].UnMinimise()
+\t\t}
+\t})
+\tmenu.AddSeparator()
+\tmenu.Add("Quit").OnClick(func(ctx *application.Context) {
+\t\tapp.Quit()
+\t})
+\tsystray.SetMenu(menu)`,
         });
       }
     } else {
+      // Create system tray Go file for v2
+      const trayGoPath = join(config.projectPath, 'systray.go');
+      const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
+      await fse.writeFile(trayGoPath, trayGoContent);
+      
       // Wails v2 approach - add to app options
       const alreadyPatched = await mainGoContains(config.projectPath, 'setupSystemTray');
       
@@ -65,27 +100,49 @@ System tray support has been added to your application.
 ${config.wailsVersion === 3 ? `
 ## Wails v3 Usage
 
-The system tray is initialized in \`main.go\`:
+The system tray is fully initialized in \`main.go\` with icon and menu:
 
 \`\`\`go
-systray := app.SystemTray.New()
-systray.SetLabel("${config.projectName}")
-// systray.SetIcon(trayIcon) // Add icon data
-\`\`\`
-
-### Adding an Icon
-
-1. Embed your icon file:
-\`\`\`go
-import _ "embed"
-
-//go:embed appicon.png
+// At the top of main.go
+//go:embed build/appicon.png
 var trayIcon []byte
+
+// In main() function
+systray := app.SystemTray.New()
+systray.SetIcon(trayIcon)
+systray.SetLabel("${config.projectName}")
+
+// Add system tray menu
+menu := app.NewMenu()
+menu.Add("Show Window").OnClick(func(ctx *application.Context) {
+\twindows := app.Window.GetAll()
+\tif len(windows) > 0 {
+\t\twindows[0].Show()
+\t\twindows[0].UnMinimise()
+\t}
+})
+menu.AddSeparator()
+menu.Add("Quit").OnClick(func(ctx *application.Context) {
+\tapp.Quit()
+})
+systray.SetMenu(menu)
 \`\`\`
 
-2. Set the icon:
+### Adding a Custom Icon
+
+Replace \`build/appicon.png\` with your own icon file. Supported formats:
+- Windows: .ico, .png
+- macOS: .png (will be used as template image)
+- Linux: .png
+
+### Adding Menu Items
+
+Add more menu items before setting the menu:
+
 \`\`\`go
-systray.SetIcon(trayIcon)
+menu.Add("Settings").OnClick(func(ctx *application.Context) {
+\t// Open settings window
+})
 \`\`\`
 ` : `
 ## Wails v2 Usage
@@ -126,18 +183,27 @@ Icon: icon,
 
 ## Features
 
-- Show/Hide window
+- Show/Hide window from tray menu
 - Quit application
-- Custom menu items
-- Left/Right click handlers
+- Custom icon support
+- Menu with separators
+${config.wailsVersion === 3 ? '- Direct menu creation in main.go' : '- Keyboard shortcuts support'}
 
 ## Customization
 
+${config.wailsVersion === 3 ? `
+Edit the menu creation code in \`main.go\` to:
+- Add more menu items
+- Change menu item labels
+- Add custom click handlers
+- Create submenus
+` : `
 Edit \`systray.go\` to:
 - Add more menu items
 - Change keyboard shortcuts
 - Customize click behavior
 - Add submenus
+`}
 
 ## Platform Support
 
