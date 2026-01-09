@@ -68,6 +68,7 @@ export async function patchMainGo(
   options: {
     afterAppCreation?: string;
     beforeRun?: string;
+    addService?: string;
   }
 ): Promise<void> {
   const mainGoPath = join(projectPath, 'main.go');
@@ -80,6 +81,46 @@ export async function patchMainGo(
 
   if (wailsVersion === 3) {
     // Wails v3 uses application.New()
+    
+    // Add service to Services array
+    if (options.addService) {
+      // Find Services array with proper brace matching
+      const servicesStart = content.indexOf('Services: []application.Service{');
+      
+      if (servicesStart !== -1) {
+        // Start after the opening brace
+        let pos = servicesStart + 'Services: []application.Service{'.length;
+        let depth = 1;
+        let startPos = pos;
+        
+        // Find the matching closing brace
+        while (pos < content.length && depth > 0) {
+          if (content[pos] === '{') depth++;
+          else if (content[pos] === '}') depth--;
+          pos++;
+        }
+        
+        if (depth === 0) {
+          // Extract existing services content
+          const existingServices = content.substring(startPos, pos - 1).trim();
+          
+          if (existingServices && !existingServices.includes(options.addService)) {
+            // Add to existing services - preserve existing formatting
+            // Remove any trailing comma to avoid double commas
+            const cleanedServices = existingServices.replace(/,\s*$/, '');
+            const newServices = `Services: []application.Service{${cleanedServices},\n\t\t\tapplication.NewService(${options.addService}),\n\t\t}`;
+            const oldServices = content.substring(servicesStart, pos);
+            content = content.replace(oldServices, newServices);
+          } else if (!existingServices) {
+            // First service
+            const newServices = `Services: []application.Service{\n\t\t\tapplication.NewService(${options.addService}),\n\t\t}`;
+            const oldServices = content.substring(servicesStart, pos);
+            content = content.replace(oldServices, newServices);
+          }
+        }
+      }
+    }
+    
     // Add code after app := application.New(...)
     if (options.afterAppCreation) {
       // Find the application.New() call and properly match nested braces

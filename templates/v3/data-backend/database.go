@@ -1,5 +1,23 @@
 package main
 
+// SQLite Database Helper
+//
+// IMPORTANT: go-sqlite3 requires CGO to be enabled.
+// 1. Run: go get github.com/mattn/go-sqlite3@latest
+//
+// 2. Install a C compiler (required for CGO):
+//    Windows: Install MinGW-w64 or TDM-GCC and add to PATH
+//    macOS: Install Xcode Command Line Tools
+//    Linux: Install gcc (usually pre-installed)
+//
+// 3. Build with CGO enabled:
+//    Windows: $env:CGO_ENABLED="1"; wails3 task windows:build
+//    macOS/Linux: CGO_ENABLED=1 wails3 build
+//
+// Alternative: Use modernc.org/sqlite (pure Go, no CGO needed)
+//
+// Note: wails3 dev runs with CGO_ENABLED=0, so database will show stub errors in dev mode.
+
 import (
 	"database/sql"
 	"fmt"
@@ -12,7 +30,7 @@ import (
 var db *sql.DB
 
 // InitDatabase initializes the SQLite database
-func (a *App) InitDatabase() error {
+func InitDatabase() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("failed to get home dir: %w", err)
@@ -29,11 +47,11 @@ func (a *App) InitDatabase() error {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 
-	return a.createTables()
+	return createTables()
 }
 
 // createTables creates the database schema
-func (a *App) createTables() error {
+func createTables() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +71,7 @@ func (a *App) createTables() error {
 }
 
 // CloseDatabase closes the database connection
-func (a *App) CloseDatabase() error {
+func CloseDatabase() error {
 	if db != nil {
 		return db.Close()
 	}
@@ -61,7 +79,7 @@ func (a *App) CloseDatabase() error {
 }
 
 // ExecuteQuery executes a SQL query
-func (a *App) ExecuteQuery(query string) (string, error) {
+func ExecuteQuery(query string) (string, error) {
 	rows, err := db.Query(query)
 	if err != nil {
 		return "", fmt.Errorf("query failed: %w", err)
@@ -72,7 +90,7 @@ func (a *App) ExecuteQuery(query string) (string, error) {
 }
 
 // InsertUser inserts a new user
-func (a *App) InsertUser(name, email string) (int64, error) {
+func InsertUser(name, email string) (int64, error) {
 	result, err := db.Exec("INSERT INTO users (name, email) VALUES (?, ?)", name, email)
 	if err != nil {
 		return 0, fmt.Errorf("insert failed: %w", err)
@@ -82,7 +100,7 @@ func (a *App) InsertUser(name, email string) (int64, error) {
 }
 
 // GetUsers retrieves all users
-func (a *App) GetUsers() ([]map[string]interface{}, error) {
+func GetUsers() ([]map[string]interface{}, error) {
 	rows, err := db.Query("SELECT id, name, email, created_at FROM users")
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
@@ -107,4 +125,17 @@ func (a *App) GetUsers() ([]map[string]interface{}, error) {
 	}
 
 	return users, nil
+}
+
+// DatabaseService provides database operations to the frontend
+type DatabaseService struct{}
+
+// AddUser adds a new user to the database
+func (d *DatabaseService) AddUser(name, email string) (int64, error) {
+	return InsertUser(name, email)
+}
+
+// ListUsers retrieves all users from the database
+func (d *DatabaseService) ListUsers() ([]map[string]interface{}, error) {
+	return GetUsers()
 }

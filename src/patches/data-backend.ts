@@ -24,6 +24,30 @@ export async function applySQLite(config: GeneratorConfig): Promise<void> {
     
     await fse.writeFile(schemaPath, schema);
 
+    // Add frontend example files
+    const frontendDir = config.wailsVersion === 3 
+      ? join(config.projectPath, 'frontend', 'src')
+      : join(config.projectPath, 'frontend', 'src');
+    
+    if (await fse.pathExists(frontendDir)) {
+      // Add helper functions file
+      const exampleFile = config.features.typescript ? 'database-example.ts' : 'database-example.js';
+      const examplePath = join(frontendDir, exampleFile);
+      const exampleCode = await readTemplate(`data-backend/${exampleFile}`, config.wailsVersion);
+      await fse.writeFile(examplePath, exampleCode);
+      
+      // Add DatabaseDemo component (React only for now)
+      if (config.frontend === 'react') {
+        const componentExt = config.features.typescript ? 'tsx' : 'jsx';
+        const componentPath = join(frontendDir, `DatabaseDemo.${componentExt}`);
+        const componentCode = await readTemplate(`data-backend/DatabaseDemo.${componentExt}`, config.wailsVersion);
+        await fse.writeFile(componentPath, componentCode);
+        
+        // Patch App file to import and use DatabaseDemo
+        await patchAppFileForDatabase(config, frontendDir, componentExt);
+      }
+    }
+
     // Add Go dependency note
     const goModPath = join(config.projectPath, 'go.mod');
     if (await fse.pathExists(goModPath)) {
@@ -39,12 +63,13 @@ export async function applySQLite(config: GeneratorConfig): Promise<void> {
     
     if (!alreadyPatched) {
       if (config.wailsVersion === 3) {
-        // For v3, add after app creation
+        // For v3, add after app creation and register service
         await patchMainGo(config.projectPath, 3, {
           afterAppCreation: `\t// Initialize database
-\tif err := appInstance.InitDatabase(); err != nil {
-\t\tfmt.Println("Failed to initialize database:", err)
+\tif err := InitDatabase(); err != nil {
+\t\tlog.Println("Failed to initialize database:", err)
 \t}`,
+          addService: '&DatabaseService{}',
         });
       } else {
         // For v2, we need to add it in the startup method of app.go
@@ -124,6 +149,67 @@ export async function applySupabase(config: GeneratorConfig): Promise<void> {
     spinner.fail('Failed to add Supabase integration');
     throw error;
   }
+}
+
+/**
+ * Patches the App component file to import and render DatabaseDemo
+ */
+async function patchAppFileForDatabase(
+  config: GeneratorConfig,
+  frontendDir: string,
+  componentExt: string
+): Promise<void> {
+  const appFilePath = join(frontendDir, `App.${componentExt}`);
+  
+  if (!(await fse.pathExists(appFilePath))) {
+    return; // App file doesn't exist, skip patching
+  }
+  
+  let appContent = await fse.readFile(appFilePath, 'utf-8');
+  
+  // Check if already patched
+  if (appContent.includes('DatabaseDemo')) {
+    return;
+  }
+  
+  // Add import statement after other imports
+  const importStatement = `import DatabaseDemo from './DatabaseDemo';\n`;
+  
+  // Find the last import statement
+  const lastImportMatch = appContent.match(/import .* from .*;\n/g);
+  if (lastImportMatch) {
+    const lastImport = lastImportMatch[lastImportMatch.length - 1];
+    appContent = appContent.replace(lastImport, lastImport + importStatement);
+  }
+  
+  // Add DatabaseDemo component before the closing div of the container
+  // Look for common patterns in App files
+  const patterns = [
+    // Pattern 1: Before </div> that closes main container
+    {
+      search: /(\s*<\/div>\s*\)\s*}\s*export default App)/,
+      replace: `      <DatabaseDemo />\n$1`
+    },
+    // Pattern 2: Before closing return statement
+    {
+      search: /(\s*<\/div>\s*\)\s*;?\s*}\s*function App)/,
+      replace: `      <DatabaseDemo />\n$1`
+    },
+    // Pattern 3: Generic - before last </div> in return
+    {
+      search: /(\s*<\/div>\s*$)/m,
+      replace: `      <DatabaseDemo />\n$1`
+    }
+  ];
+  
+  for (const pattern of patterns) {
+    if (pattern.search.test(appContent)) {
+      appContent = appContent.replace(pattern.search, pattern.replace);
+      break;
+    }
+  }
+  
+  await fse.writeFile(appFilePath, appContent);
 }
 
 
