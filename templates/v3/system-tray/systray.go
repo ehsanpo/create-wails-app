@@ -5,7 +5,7 @@ import (
 )
 
 // setupSystemTray creates and configures the system tray with menu items
-func (a *App) setupSystemTray(app *application.App, systray *application.SystemTray, window *application.WebviewWindow) {
+func setupSystemTray(app *application.App, systray *application.SystemTray, window *application.WebviewWindow, projectName string) {
 	// Create the tray menu
 	menu := app.NewMenu()
 
@@ -26,13 +26,4 @@ func (a *App) setupSystemTray(app *application.App, systray *application.SystemT
 	systray.SetMenu(menu)
 }
 
-// OnTrayIconLeftClick handles left click on system tray icon
-func (a *App) OnTrayIconLeftClick() {
-	// This will be handled by Wails automatically
-}
-
-// OnTrayIconRightClick handles right click on system tray icon
-func (a *App) OnTrayIconRightClick() {
-	// This will show the menu automatically
-}
 

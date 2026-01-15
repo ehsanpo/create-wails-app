@@ -7,54 +7,54 @@ import { patchMainGo, mainGoContains } from './helpers.js';
 
 export async function applySystemTray(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding system tray support...').start();
-  
+
   try {
     // Patch main.go to initialize system tray
     if (config.wailsVersion === 3) {
-      // Wails v3 approach - add full implementation directly to main.go
+      // Create system tray Go file for v3
+      const trayGoPath = join(config.projectPath, 'systray.go');
+      const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
+      await fse.writeFile(trayGoPath, trayGoContent);
+
+      // Patch main.go to initialize system tray
       const alreadyPatched = await mainGoContains(config.projectPath, 'SystemTray.New()');
-      
+
       if (!alreadyPatched) {
         // First, add the icon embed directive at the top of the file
         const mainGoPath = join(config.projectPath, 'main.go');
         let content = await fse.readFile(mainGoPath, 'utf-8');
-        
+
         // Add icon embed after the assets embed
         if (!content.includes('//go:embed build/appicon.png')) {
           const assetsEmbedPattern = /(\/\/go:embed all:frontend\/dist\s*\n\s*var assets embed\.FS)/;
           const match = content.match(assetsEmbedPattern);
-          
+
           if (match) {
             const insertPos = match.index! + match[0].length;
-            content = content.slice(0, insertPos) + 
-              '\n\n//go:embed build/appicon.png\nvar trayIcon []byte' + 
+            content = content.slice(0, insertPos) +
+              '\n\n//go:embed build/appicon.png\nvar trayIcon []byte' +
               content.slice(insertPos);
+
+            // Also ensure the window is assigned to a variable so we can pass it to the tray
+            content = content.replace(
+              /app\.Window\.NewWithOptions\(/,
+              'mainWindow := app.Window.NewWithOptions('
+            );
+
             await fse.writeFile(mainGoPath, content);
           }
         }
-        
-        // Now add the system tray initialization code after app creation
+
+        // Now add the system tray initialization code before app.Run()
+        // Note: For v3, setupSystemTray needs the app, systray, and window objects
         await patchMainGo(config.projectPath, 3, {
-          afterAppCreation: `\t// Create system tray
+          beforeRun: `\t// Create system tray
 \tsystray := app.SystemTray.New()
 \tsystray.SetIcon(trayIcon)
 \tsystray.SetLabel("${config.projectName}")
-
-\t// Add system tray menu
-\tmenu := app.NewMenu()
-\tmenu.Add("Show Window").OnClick(func(ctx *application.Context) {
-\t\t// Show and unminimize the window
-\t\twindows := app.Window.GetAll()
-\t\tif len(windows) > 0 {
-\t\t\twindows[0].Show()
-\t\t\twindows[0].UnMinimise()
-\t\t}
-\t})
-\tmenu.AddSeparator()
-\tmenu.Add("Quit").OnClick(func(ctx *application.Context) {
-\t\tapp.Quit()
-\t})
-\tsystray.SetMenu(menu)`,
+\t
+\t// Setup tray menu using the generated systray.go function
+\tsetupSystemTray(app, systray, mainWindow, "${config.projectName}")`,
         });
       }
     } else {
@@ -62,25 +62,25 @@ export async function applySystemTray(config: GeneratorConfig): Promise<void> {
       const trayGoPath = join(config.projectPath, 'systray.go');
       const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
       await fse.writeFile(trayGoPath, trayGoContent);
-      
+
       // Wails v2 approach - add to app options
       const alreadyPatched = await mainGoContains(config.projectPath, 'setupSystemTray');
-      
+
       if (!alreadyPatched) {
         // For v2, we need to patch the wails.Run options to add OnSystemTrayReady
         const mainGoPath = join(config.projectPath, 'main.go');
         let content = await fse.readFile(mainGoPath, 'utf-8');
-        
+
         // Find the App struct and add system tray callback
         const optionsPattern = /wails\.Run\(\s*&options\.App\s*\{([^}]*)\}\s*\)/s;
         const match = content.match(optionsPattern);
-        
+
         if (match) {
           const optionsContent = match[1];
-          
+
           // Add OnSystemTrayReady if not present
           if (!optionsContent.includes('OnSystemTrayReady')) {
-            const newOptions = optionsContent.trimEnd() + 
+            const newOptions = optionsContent.trimEnd() +
               '\n\t\tOnSystemTrayReady: app.setupSystemTray,';
             content = content.replace(optionsPattern, `wails.Run(&options.App{${newOptions}\n\t})`);
             await fse.writeFile(mainGoPath, content);
