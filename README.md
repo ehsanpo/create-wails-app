@@ -191,6 +191,23 @@ npm run build
 node bin/run.js
 ```
 
+### Testing
+
+The project uses [Jest](https://jestjs.io/) and [ts-jest](https://kulshekhar.github.io/ts-jest/) for integration testing.
+
+```bash
+# Run all tests
+npm test
+
+# Run a specific scenario test
+npm test -- tests/scenario1.test.ts
+
+# Run with verbose output
+npm test -- --verbose
+```
+
+Note: Integration tests may take a few minutes as they invoke the Wails CLI and perform `npm install` for the generated projects.
+
 ## Contributing
 
 Contributions are welcome! Please:
