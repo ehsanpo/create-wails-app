@@ -41,7 +41,8 @@ export async function applySQLite(config: GeneratorConfig): Promise<void> {
         const componentExt = config.features.typescript ? 'tsx' : 'jsx';
         const componentPath = join(frontendDir, `DatabaseDemo.${componentExt}`);
         const componentCode = await readTemplate(`data-backend/DatabaseDemo.${componentExt}`, config.wailsVersion);
-        await fse.writeFile(componentPath, componentCode);
+        const updatedCode = componentCode.replace(/changeme/g, config.projectName);
+        await fse.writeFile(componentPath, updatedCode);
         
         // Patch App file to import and use DatabaseDemo
         await patchAppFileForDatabase(config, frontendDir, componentExt);
