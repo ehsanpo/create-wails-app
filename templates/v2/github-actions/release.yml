@@ -46,9 +46,9 @@ jobs:
         run: {{WAILS_CLI}} build
       
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: {{PROJECT_NAME}}-${{ matrix.os }}
+          name: {{PROJECT_NAME}}-${{ matrix.os }}-${{ github.run_number }}
           path: build/bin/
   
   release:
@@ -58,14 +58,17 @@ jobs:
     
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          pattern: {{PROJECT_NAME}}-*
+          merge-multiple: true
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            {{PROJECT_NAME}}-ubuntu-latest/*
-            {{PROJECT_NAME}}-macos-latest/*
-            {{PROJECT_NAME}}-windows-latest/*
+            **/{{PROJECT_NAME}}-ubuntu-latest-*/
+            **/{{PROJECT_NAME}}-macos-latest-*/
+            **/{{PROJECT_NAME}}-windows-latest-*/
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
