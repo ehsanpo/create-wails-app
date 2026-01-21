@@ -1,0 +1,5 @@
+
+// Go Backend Testing
+// Create test files with _test.go suffix
+// Use testing package: import "testing"
+// Run tests with: go test ./...

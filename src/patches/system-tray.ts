@@ -2,174 +2,222 @@ import fse from 'fs-extra';
 import { join } from 'path';
 import type { GeneratorConfig } from '../types.js';
 import ora from 'ora';
+import { readTemplate } from './template-reader.js';
+import { patchMainGo, mainGoContains } from './helpers.js';
 
 export async function applySystemTray(config: GeneratorConfig): Promise<void> {
   const spinner = ora('Adding system tray support...').start();
-  
+
   try {
-    // Create system tray Go file
-    const trayGoPath = join(config.projectPath, 'systray.go');
-    const trayGoContent = `package main
+    // Patch main.go to initialize system tray
+    if (config.wailsVersion === 3) {
+      // Create system tray Go file for v3
+      const trayGoPath = join(config.projectPath, 'systray.go');
+      const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
+      await fse.writeFile(trayGoPath, trayGoContent);
 
-import (
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-)
+      // Patch main.go to initialize system tray
+      const alreadyPatched = await mainGoContains(config.projectPath, 'SystemTray.New()');
 
-// setupSystemTray creates and configures the system tray
-func (a *App) setupSystemTray() *menu.Menu {
-	// Create system tray menu
-	trayMenu := menu.NewMenu()
+      if (!alreadyPatched) {
+        // First, add the icon embed directive at the top of the file
+        const mainGoPath = join(config.projectPath, 'main.go');
+        let content = await fse.readFile(mainGoPath, 'utf-8');
 
-	// Show/Hide window item
-	trayMenu.Append(menu.Text("Show Window", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
-		runtime.WindowShow(a.ctx)
-		runtime.WindowUnminimise(a.ctx)
-	}))
+        // Add icon embed after the assets embed
+        if (!content.includes('//go:embed build/appicon.png')) {
+          const assetsEmbedPattern = /(\/\/go:embed all:frontend\/dist\s*\n\s*var assets embed\.FS)/;
+          const match = content.match(assetsEmbedPattern);
 
-	trayMenu.Append(menu.Separator())
+          if (match) {
+            const insertPos = match.index! + match[0].length;
+            content = content.slice(0, insertPos) +
+              '\n\n//go:embed build/appicon.png\nvar trayIcon []byte' +
+              content.slice(insertPos);
 
-	// Quit item
-	trayMenu.Append(menu.Text("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
-		runtime.Quit(a.ctx)
-	}))
+            // Also ensure the window is assigned to a variable so we can pass it to the tray
+            // If the pattern isn't found, still perform the replacement to make downstream references safe
+            if (!content.includes('mainWindow := app.Window.NewWithOptions(')) {
+              content = content.replace(
+                /app\.Window\.NewWithOptions\(/,
+                'mainWindow := app.Window.NewWithOptions('
+              );
+            }
 
-	return trayMenu
-}
+            await fse.writeFile(mainGoPath, content);
+          }
+        }
 
-// OnTrayIconLeftClick handles left click on system tray icon
-func (a *App) OnTrayIconLeftClick() {
-	runtime.WindowShow(a.ctx)
-	runtime.WindowUnminimise(a.ctx)
-}
+        // Now add the system tray initialization code before app.Run()
+        // Note: For v3, setupSystemTray needs the app, systray, and window objects
+        await patchMainGo(config.projectPath, 3, {
+          beforeRun: `\t// Create system tray
+\tsystray := app.SystemTray.New()
+\tsystray.SetIcon(trayIcon)
+\tsystray.SetLabel("${config.projectName}")
+\t
+\t// Setup tray menu using the generated systray.go function
+\tsetupSystemTray(app, systray, mainWindow, "${config.projectName}")`,
+        });
+      }
+    } else {
+      // Create system tray Go file for v2
+      const trayGoPath = join(config.projectPath, 'systray.go');
+      const trayGoContent = await readTemplate('system-tray/systray.go', config.wailsVersion);
+      await fse.writeFile(trayGoPath, trayGoContent);
 
-// OnTrayIconRightClick handles right click on system tray icon
-// This will show the tray menu automatically
-func (a *App) OnTrayIconRightClick() {
-	// Menu is shown automatically by Wails
-}
-`;
+      // Wails v2 approach - add to app options
+      const alreadyPatched = await mainGoContains(config.projectPath, 'setupSystemTray');
 
-    await fse.writeFile(trayGoPath, trayGoContent);
+      if (!alreadyPatched) {
+        // For v2, we need to patch the wails.Run options to add OnSystemTrayReady
+        const mainGoPath = join(config.projectPath, 'main.go');
+        let content = await fse.readFile(mainGoPath, 'utf-8');
 
-    // Create README for system tray
-    const trayReadmePath = join(config.projectPath, 'SYSTRAY.md');
-    const trayReadmeContent = `# System Tray Implementation
+        // Find the App struct and add system tray callback
+        const optionsPattern = /wails\.Run\(\s*&options\.App\s*\{([^}]*)\}\s*\)/s;
+        const match = content.match(optionsPattern);
+
+        if (match) {
+          const optionsContent = match[1];
+
+          // Add OnSystemTrayReady if not present
+          if (!optionsContent.includes('OnSystemTrayReady')) {
+            const newOptions = optionsContent.trimEnd() +
+              '\n\t\tOnSystemTrayReady: app.setupSystemTray,';
+            content = content.replace(optionsPattern, `wails.Run(&options.App{${newOptions}\n\t})`);
+            await fse.writeFile(mainGoPath, content);
+          }
+        }
+      }
+    }
+
+    // Create documentation
+    const readmePath = join(config.projectPath, 'SYSTEM_TRAY.md');
+    const readme = `# System Tray
 
 ## Overview
 
-System tray support has been added to your application. The implementation includes:
+System tray support has been added to your application.
 
-- System tray icon with menu
-- Show/Hide window functionality
-- Quit option
-- Click handlers
+${config.wailsVersion === 3 ? `
+## Wails v3 Usage
 
-## Files
-
-- \`systray.go\` - System tray implementation
-- \`build/appicon.png\` - Icon file (you need to provide this)
-
-## Usage
-
-The system tray is configured in your \`main.go\`:
+The system tray is fully initialized in \`main.go\` with icon and menu:
 
 \`\`\`go
-// In main.go, add to application options:
-TrayMenu:     app.setupSystemTray(),
+// At the top of main.go
+//go:embed build/appicon.png
+var trayIcon []byte
+
+// In main() function
+systray := app.SystemTray.New()
+systray.SetIcon(trayIcon)
+systray.SetLabel("${config.projectName}")
+
+// Add system tray menu
+menu := app.NewMenu()
+menu.Add("Show Window").OnClick(func(ctx *application.Context) {
+\twindows := app.Window.GetAll()
+\tif len(windows) > 0 {
+\t\twindows[0].Show()
+\t\twindows[0].UnMinimise()
+\t}
+})
+menu.AddSeparator()
+menu.Add("Quit").OnClick(func(ctx *application.Context) {
+\tapp.Quit()
+})
+systray.SetMenu(menu)
 \`\`\`
 
-## Icon Setup
+### Adding a Custom Icon
 
-### 1. Add Your Icon
+Replace \`build/appicon.png\` with your own icon file. Supported formats:
+- Windows: .ico, .png
+- macOS: .png (will be used as template image)
+- Linux: .png
 
-Place your tray icon at:
-- **Windows**: \`build/windows/icon.ico\`
-- **macOS**: \`build/darwin/icon.png\` (22x22 pixels recommended)
-- **Linux**: \`build/linux/icon.png\`
+### Adding Menu Items
 
-### 2. Icon Guidelines
-
-- **Windows**: 16x16 or 32x32 pixels, .ico format
-- **macOS**: 22x22 pixels (44x44 for Retina), .png with transparency
-- **Linux**: 22x22 or 48x48 pixels, .png
-
-## Customization
-
-### Add More Menu Items
-
-Edit \`systray.go\` and add items to \`setupSystemTray()\`:
+Add more menu items before setting the menu:
 
 \`\`\`go
-trayMenu.Append(menu.Text("Settings", nil, func(_ *menu.CallbackData) {
-    // Open settings window
-}))
+menu.Add("Settings").OnClick(func(ctx *application.Context) {
+\t// Open settings window
+})
 \`\`\`
+` : `
+## Wails v2 Usage
 
-### Change Click Behavior
+The system tray is configured in \`main.go\` via the \`OnSystemTrayReady\` callback.
 
-Modify the click handlers:
+### Customizing the Tray Menu
+
+Edit \`systray.go\` to customize the menu items:
 
 \`\`\`go
-func (a *App) OnTrayIconLeftClick() {
-    // Your custom action
+func (a *App) setupSystemTray() *menu.Menu {
+\ttrayMenu := menu.NewMenu()
+\t
+\t// Add your menu items
+\ttrayMenu.Append(menu.Text("Show Window", keys.CmdOrCtrl("s"), func(_ *menu.CallbackData) {
+\t\truntime.WindowShow(a.ctx)
+\t}))
+\t
+\treturn trayMenu
 }
 \`\`\`
 
-## Hide Window on Close
+### Adding an Icon
 
-To minimize to tray instead of closing, update your frontend:
+In your \`main.go\`, embed an icon and pass it to the options:
 
-\`\`\`javascript
-// In your frontend, before window close
-import { EventsOn } from '@wailsapp/runtime';
+\`\`\`go
+import _ "embed"
 
-window.addEventListener('beforeunload', (e) => {
-    e.preventDefault();
-    // Minimize to tray instead of closing
-});
+//go:embed appicon.ico
+var icon []byte
+
+// Then in wails.Run:
+Icon: icon,
 \`\`\`
+`}
 
-## Platform Notes
+## Features
 
-- **macOS**: Tray icon appears in menu bar (top right)
-- **Windows**: Tray icon appears in system tray (bottom right)
-- **Linux**: Depends on desktop environment
+- Show/Hide window from tray menu
+- Quit application
+- Custom icon support
+- Menu with separators
+${config.wailsVersion === 3 ? '- Direct menu creation in main.go' : '- Keyboard shortcuts support'}
 
-## Resources
+## Customization
 
-- [Wails System Tray Docs](https://wails.io/docs/reference/menus)
-- [Icon Design Guidelines](https://wails.io/docs/guides/application-development#application-icons)
+${config.wailsVersion === 3 ? `
+Edit the menu creation code in \`main.go\` to:
+- Add more menu items
+- Change menu item labels
+- Add custom click handlers
+- Create submenus
+` : `
+Edit \`systray.go\` to:
+- Add more menu items
+- Change keyboard shortcuts
+- Customize click behavior
+- Add submenus
+`}
+
+## Platform Support
+
+- Windows: Supports icons and menus
+- macOS: Supports icons and menus
+- Linux: Support varies by desktop environment
 `;
 
-    await fse.writeFile(trayReadmePath, trayReadmeContent);
+    await fse.writeFile(readmePath, readme);
 
-    // Update main.go instructions
-    const mainGoInstructions = join(config.projectPath, 'SETUP_INSTRUCTIONS.md');
-    const instructions = `
-## System Tray Setup
-
-1. **Add to main.go**: In your application options, add:
-   \`\`\`go
-   TrayMenu: app.setupSystemTray(),
-   OnTrayIconLeftClick: app.OnTrayIconLeftClick,
-   \`\`\`
-
-2. **Add your icon**: Place icon files in the \`build/\` directory
-
-3. **See SYSTRAY.md** for complete documentation
-`;
-
-    if (await fse.pathExists(mainGoInstructions)) {
-      let content = await fse.readFile(mainGoInstructions, 'utf-8');
-      content += instructions;
-      await fse.writeFile(mainGoInstructions, content);
-    } else {
-      await fse.writeFile(mainGoInstructions, `# Setup Instructions\n${instructions}`);
-    }
-
-    spinner.succeed('System tray support added - see SYSTRAY.md for setup');
+    spinner.succeed('System tray support added - check SYSTEM_TRAY.md for usage');
   } catch (error) {
     spinner.fail('Failed to add system tray support');
     throw error;

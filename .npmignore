@@ -2,6 +2,9 @@
 src/
 tsconfig.json
 
+# Templates are INCLUDED in the package (not ignored)
+# templates/
+
 # Development files
 .vscode/
 .idea/
