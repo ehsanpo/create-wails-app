@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // OpenFileDialog opens a native file picker dialog
@@ -43,7 +43,7 @@ func (a *App) OpenDirectoryDialog() (string, error) {
 // SaveFileDialog opens a native save file dialog
 func (a *App) SaveFileDialog() (string, error) {
 	file, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title: "Save File",
+		Title:           "Save File",
 		DefaultFilename: "untitled.txt",
 		Filters: []runtime.FileFilter{
 			{
