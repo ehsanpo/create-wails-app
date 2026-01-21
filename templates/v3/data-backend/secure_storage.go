@@ -15,7 +15,8 @@ import (
 const (
 	// This is a simple example key. In production, use a proper key derivation function
 	// or retrieve from the system keychain using github.com/99designs/keyring
-	encryptionKey = "your-32-byte-encryption-key!!" // Must be 32 bytes for AES-256
+	// IMPORTANT: Must be exactly 32 bytes for AES-256 - aes.NewCipher will fail otherwise
+	encryptionKey = "12345678901234567890123456789012" // Exactly 32 bytes for AES-256
 )
 
 // SecureStorage provides encrypted storage
