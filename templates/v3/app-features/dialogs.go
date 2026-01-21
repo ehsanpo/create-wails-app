@@ -6,9 +6,9 @@ import (
 
 // OpenFileDialog opens a native file picker dialog
 func (a *App) OpenFileDialog() (string, error) {
-	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+	file, err := a.app.Dialog.OpenFile(&application.FileDialogOptions{
 		Title: "Select File",
-		Filters: []runtime.FileFilter{
+		Filters: []application.FileFilter{
 			{
 				DisplayName: "All Files (*.*)",
 				Pattern:     "*.*",

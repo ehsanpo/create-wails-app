@@ -21,8 +21,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
@@ -78,9 +78,28 @@ func CloseDatabase() error {
 	return nil
 }
 
-// ExecuteQuery executes a SQL query
-func ExecuteQuery(query string) (string, error) {
-	rows, err := db.Query(query)
+// ExecuteQuery executes a predefined SQL query by identifier
+func ExecuteQuery(queryID string, args ...interface{}) (string, error) {
+	var stmt *sql.Stmt
+	var err error
+
+	switch queryID {
+	case "get_all_users":
+		stmt, err = db.Prepare("SELECT id, name, email FROM users")
+	case "get_user_by_id":
+		stmt, err = db.Prepare("SELECT id, name, email FROM users WHERE id = ?")
+	case "get_user_by_email":
+		stmt, err = db.Prepare("SELECT id, name, email FROM users WHERE email = ?")
+	default:
+		return "", fmt.Errorf("unknown query identifier: %s", queryID)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return "", fmt.Errorf("query failed: %w", err)
 	}
