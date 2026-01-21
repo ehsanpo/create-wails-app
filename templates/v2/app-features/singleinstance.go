@@ -15,21 +15,29 @@ func (a *App) initSingleInstance() error {
 	tmpDir := os.TempDir()
 	lockFile = filepath.Join(tmpDir, "{{PROJECT_NAME}}.lock")
 
-	// Check if lock file exists
-	if _, err := os.Stat(lockFile); err == nil {
-		// Lock file exists, check if process is running
-		data, err := os.ReadFile(lockFile)
-		if err == nil {
-			fmt.Printf("Another instance is already running (PID: %s)\n", string(data))
+	// Try to create lock file atomically
+	pid := fmt.Sprintf("%d", os.Getpid())
+	file, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			// Lock file already exists, read the PID to show which process is running
+			data, readErr := os.ReadFile(lockFile)
+			if readErr == nil {
+				fmt.Printf("Another instance is already running (PID: %s)\n", string(data))
+			} else {
+				fmt.Printf("Another instance is already running\n")
+			}
 			return fmt.Errorf("application is already running")
 		}
-	}
-
-	// Create lock file with current PID
-	pid := fmt.Sprintf("%d", os.Getpid())
-	err := os.WriteFile(lockFile, []byte(pid), 0644)
-	if err != nil {
 		return fmt.Errorf("failed to create lock file: %w", err)
+	}
+	defer file.Close()
+
+	// Write current PID to the lock file
+	_, err = file.WriteString(pid)
+	if err != nil {
+		os.Remove(lockFile) // Clean up if write fails
+		return fmt.Errorf("failed to write PID to lock file: %w", err)
 	}
 
 	return nil
