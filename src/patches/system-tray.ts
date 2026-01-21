@@ -36,10 +36,13 @@ export async function applySystemTray(config: GeneratorConfig): Promise<void> {
               content.slice(insertPos);
 
             // Also ensure the window is assigned to a variable so we can pass it to the tray
-            content = content.replace(
-              /app\.Window\.NewWithOptions\(/,
-              'mainWindow := app.Window.NewWithOptions('
-            );
+            // If the pattern isn't found, still perform the replacement to make downstream references safe
+            if (!content.includes('mainWindow := app.Window.NewWithOptions(')) {
+              content = content.replace(
+                /app\.Window\.NewWithOptions\(/,
+                'mainWindow := app.Window.NewWithOptions('
+              );
+            }
 
             await fse.writeFile(mainGoPath, content);
           }
